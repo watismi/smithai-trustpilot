@@ -2,9 +2,8 @@ name: Update Trustpilot JSON
 
 on:
   schedule:
-    # every 1 hours; adjust as you like
-    - cron:  '0 */1 * * *'
-  workflow_dispatch:   # allows manual runs
+    - cron:  '0 */6 * * *'       # every 6h
+  workflow_dispatch:             # manual trigger in Actions UI
 
 jobs:
   fetch:
@@ -21,18 +20,26 @@ jobs:
           API_KEY: ${{ secrets.TRUSTPILOT_API_KEY }}
           BU_ID:  ${{ secrets.TRUSTPILOT_BUSINESS_UNIT_ID }}
         run: |
+          # 1. Call Trustpilot
           response=$(curl -s -H "apikey: $API_KEY" \
             "https://api.trustpilot.com/v1/business-units/$BU_ID")
+          # 2. Extract score & stars
           score=$(echo "$response" | jq '.statistics.trustScore')
           stars=$(echo "$response" | jq '.statistics.stars')
-          printf '{"trustScore": %.1f, "stars": %.1f}' \
-            "$score" "$stars" > trustpilot.json
+          # 3. Build an ISO-8601 UTC timestamp
+          timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          # 4. Write JSON with lastUpdated
+          jq -n \
+            --arg ts   "$timestamp" \
+            --argjson tr $score \
+            --argjson st $stars \
+            '{ trustScore: $tr, stars: $st, lastUpdated: $ts }' \
+            > trustpilot.json
 
       - name: Commit & Push changes
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add trustpilot.json
-          # only commit if changed
           git diff --quiet || git commit -m "chore: update Trustpilot data"
           git push
