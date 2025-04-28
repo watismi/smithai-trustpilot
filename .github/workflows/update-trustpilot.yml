@@ -1,4 +1,4 @@
-name: Update Trustpilot JSON (Debug Mode)
+name: Update Trustpilot JSON
 
 on:
   schedule:
@@ -26,17 +26,17 @@ jobs:
           # 1. Call Trustpilot
           response=$(curl -s -H "apikey: $API_KEY" \
             "https://api.trustpilot.com/v1/business-units/$BU_ID")
-          
-          # 2. Debug: Print raw API response
+
+          # 2. Debug: (optional) Print raw API response
           echo "========== Trustpilot API Raw Response =========="
           echo "$response"
           echo "================================================="
 
-          # 3. Try to extract trustScore and stars
-          score=$(echo "$response" | jq '.statistics.trustScore')
-          stars=$(echo "$response" | jq '.statistics.stars')
+          # 3. Extract trustScore and stars (corrected paths)
+          trustScore=$(echo "$response" | jq '.score.trustScore')
+          stars=$(echo "$response" | jq '.score.stars')
 
-          echo "Extracted trustScore: $score"
+          echo "Extracted trustScore: $trustScore"
           echo "Extracted stars: $stars"
 
           # 4. Build an ISO-8601 UTC timestamp
@@ -45,7 +45,7 @@ jobs:
           # 5. Write JSON with lastUpdated
           jq -n \
             --arg ts "$timestamp" \
-            --argjson tr ${score:-0} \
+            --argjson tr ${trustScore:-0} \
             --argjson st ${stars:-0} \
             '{ trustScore: $tr, stars: $st, lastUpdated: $ts }' \
             > trustpilot.json
