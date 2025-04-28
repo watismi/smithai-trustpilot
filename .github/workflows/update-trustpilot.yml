@@ -1,4 +1,4 @@
-name: Update Trustpilot JSON
+name: Update Trustpilot JSON (Debug Mode)
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:             # manual trigger in Actions UI
 
 permissions:
-  contents: write                # <<< Needed for git push to work
+  contents: write                # Needed for git push
 
 jobs:
   fetch:
@@ -27,18 +27,26 @@ jobs:
           response=$(curl -s -H "apikey: $API_KEY" \
             "https://api.trustpilot.com/v1/business-units/$BU_ID")
           
-          # 2. Extract score & stars
+          # 2. Debug: Print raw API response
+          echo "========== Trustpilot API Raw Response =========="
+          echo "$response"
+          echo "================================================="
+
+          # 3. Try to extract trustScore and stars
           score=$(echo "$response" | jq '.statistics.trustScore')
           stars=$(echo "$response" | jq '.statistics.stars')
-          
-          # 3. Build an ISO-8601 UTC timestamp
+
+          echo "Extracted trustScore: $score"
+          echo "Extracted stars: $stars"
+
+          # 4. Build an ISO-8601 UTC timestamp
           timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
-          # 4. Write JSON with lastUpdated
+
+          # 5. Write JSON with lastUpdated
           jq -n \
             --arg ts "$timestamp" \
-            --argjson tr $score \
-            --argjson st $stars \
+            --argjson tr ${score:-0} \
+            --argjson st ${stars:-0} \
             '{ trustScore: $tr, stars: $st, lastUpdated: $ts }' \
             > trustpilot.json
 
@@ -47,7 +55,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Check if there are any changes before committing
           if ! git diff --quiet; then
             git add trustpilot.json
             git commit -m "chore: update Trustpilot data"
